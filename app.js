@@ -174,7 +174,7 @@ function composeView() {
     },
   },
     h("label", { for: "title" }, "Title"), title,
-    h("label", { for: "list" }, "Pull requests, one per line"), list,
+    h("label", { for: "list" }, "Pull request links, one per line, or any text that contains them"), list,
     h("div", { class: "compose-foot" }, hint, go),
   );
   update();
@@ -197,10 +197,12 @@ function tokenCard() {
     },
   },
     h("div", { class: "token-row" }, input, h("button", { class: "btn", type: "submit" }, "Connect")),
+    h("div", { class: "token-opts" },
     h("label", { class: "check" }, remember, " Remember on this device"),
     h("details", {},
       h("summary", {}, "Which token? It goes only to api.github.com"),
       h("p", {}, "A fine-grained token with ", h("b", {}, "Pull requests: read and write"), " on the repositories (write is only used for 👀), or a classic token with ", h("code", {}, "repo"), ". If you use the GitHub CLI, ", h("code", {}, "gh auth token"), " prints one."),
+    ),
     ),
   );
 }
@@ -230,7 +232,7 @@ function rowView(row, common) {
   if (!pr) {
     return h("li", { class: "row" },
       h("span", { class: "state missing" }, icon("open")),
-      h("div", { class: "main" }, link, h("div", { class: "sub" }, state.rows ? "not found, or your token can't see it" : "")),
+      h("div", { class: "main" }, h("div", { class: "line" }, link), state.rows && h("div", { class: "sub" }, "not found, or your token can't see it")),
     );
   }
   const checks = CHECKS[pr.commits.nodes[0]?.commit.statusCheckRollup?.state];
@@ -294,20 +296,20 @@ function bundleView() {
     : `${n} pull request${n === 1 ? "" : "s"}`;
 
   return h("section", { class: "wrap" },
-    h("div", { class: "head" },
+    h("header", { class: "head" },
       h("h1", {}, bundle.title || common || "Untitled bundle"),
       h("div", { class: "actions" },
         copy,
         h("button", { class: "quiet", onclick: () => { location.hash = ""; app.replaceChildren(composeFor()); } }, "Edit"),
         token.get() && h("button", { class: "quiet icon-only", onclick: load, disabled: state.busy, "aria-label": "Refresh", title: "Refresh" }, icon("sync", state.busy ? "spin" : "")),
       ),
-    ),
-    h("p", { class: "meta" },
+      h("p", { class: "meta" },
       stats,
       state.rows && unseen.length > 0 && [" · ", h("button", { class: "link", disabled: state.busy, onclick: () => react(unseen) }, "mark all seen")],
-      everyone.length > 0 && h("span", { class: "everyone", title: "Seen every pull request" }, everyone.slice(0, 8).map((u) => avatar(u, 18))),
+        everyone.length > 0 && h("span", { class: "everyone", title: "Seen every pull request" }, everyone.slice(0, 8).map((u) => avatar(u, 18))),
+      ),
+      common && bundle.title && common !== bundle.title && h("p", { class: "common" }, common),
     ),
-    common && bundle.title && common !== bundle.title && h("p", { class: "common" }, common),
     state.error && h("p", { class: "flash", role: "alert" }, state.error),
     !token.get() && tokenCard(),
     h("ul", { class: "rows" }, rows.map((r) => rowView(r, common))),

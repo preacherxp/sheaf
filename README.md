@@ -34,7 +34,7 @@ Any static host works the same way, GitHub Pages included. To uninstall, click *
 
 ## Usage
 
-1. Open the page without a link. Give the bundle a title and paste its pull requests, one per line: full URLs, `owner/repo#123` or `owner/repo/123`. The counter under the box says how many it understood and which lines it couldn't.
+1. Open the page without a link. Give the bundle a title and paste its pull requests: full URLs, `owner/repo#123` or `owner/repo/123`, one per line, or any text that contains PR links, such as a Slack message or a Markdown checklist. Every PR link in a line counts. The counter under the box says how many it understood and which lines had none.
 2. Click **Create link**, then **Copy link**, and send that link wherever you would have pasted eight.
 3. Whoever opens it pastes a token under **Connect to GitHub** and sees the list.
 

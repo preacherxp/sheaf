@@ -20,6 +20,19 @@ test("parseList dedupes case-insensitively and reports bad lines", () => {
   assert.deepEqual(bad, ["nope"]);
 });
 
+test("parseList accepts any line that contains a PR link", () => {
+  const text = [
+    "- [ ] api: https://github.com/acme/api/pull/412 (needs a second look)",
+    "Bump in web too, see github.com/acme/web/pull/97.",
+    "[worker](https://github.com/acme/worker/pull/31/files) and https://github.com/acme/cron/pull/8#discussion_r1",
+    "<https://github.com/acme/api/pull/412|acme/api#412> dup from Slack",
+    "https://github.com/acme/api/issues/5 is an issue, not a PR",
+  ].join("\n");
+  const { prs, bad } = parseList(text);
+  assert.deepEqual(prs.map((p) => `${p.repo}#${p.number}`), ["api#412", "web#97", "worker#31", "cron#8"]);
+  assert.equal(bad.length, 1);
+});
+
 test("encode and decode round trip, title with symbols survives", () => {
   const bundle = { title: "Bump checkout & co: v6 #1", prs: parseList("grafana/faro#128\ngrafana/lambda-promtail#234").prs };
   const hash = encode(bundle);

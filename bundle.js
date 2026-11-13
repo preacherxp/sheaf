@@ -14,14 +14,25 @@ export function parseRef(text) {
   return number > 0 && number < 2 ** 31 ? { owner: m[1], repo: m[2], number } : null;
 }
 
-// One reference per line (or comma). Duplicates are dropped, bad lines are returned.
+const PR_URL = /(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)\/pulls?\/(\d+)/gi;
+
+// A line is a reference, or any text with PR links in it (a Slack message, a Markdown
+// list), or comma separated references. Duplicates are dropped, unusable text is returned.
 export function parseList(text) {
   const prs = [], bad = [], seen = new Set();
-  for (const line of text.split(/[\n,]/).map((l) => l.trim()).filter(Boolean)) {
-    const ref = parseRef(line);
-    if (!ref) { bad.push(line); continue; }
+  const add = (ref) => {
     const key = refKey(ref).toLowerCase();
     if (!seen.has(key)) { seen.add(key); prs.push(ref); }
+  };
+  for (const line of text.split("\n").map((l) => l.trim()).filter(Boolean)) {
+    const whole = parseRef(line);
+    if (whole) { add(whole); continue; }
+    const linked = [...line.matchAll(PR_URL)].map((m) => parseRef(`${m[1]}/${m[2]}/${m[3]}`)).filter(Boolean);
+    if (linked.length) { linked.forEach(add); continue; }
+    const pieces = line.split(",").map((p) => p.trim()).filter(Boolean);
+    const refs = pieces.map(parseRef);
+    if (!refs.some(Boolean)) { bad.push(line); continue; }
+    refs.forEach((ref, i) => (ref ? add(ref) : bad.push(pieces[i])));
   }
   return { prs, bad };
 }
