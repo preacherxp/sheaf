@@ -56,14 +56,6 @@ const safeUrl = (url, prefix) => (typeof url === "string" && url.startsWith(pref
 const avatar = (user, size = 20) =>
   h("img", { class: "avatar", src: safeUrl(user?.avatarUrl, "https://avatars.githubusercontent.com/"), alt: "", width: size, height: size, title: user?.login });
 
-const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-function ago(iso) {
-  const s = (Date.parse(iso) - Date.now()) / 1000;
-  for (const [unit, n] of [["year", 31536e3], ["month", 2592e3], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]])
-    if (Math.abs(s) >= n) return rtf.format(Math.round(s / n), unit);
-  return "just now";
-}
-
 // --- GitHub ---------------------------------------------------------------
 
 async function gql(query, variables, strict = false) {
@@ -82,8 +74,7 @@ async function gql(query, variables, strict = false) {
   return body.data;
 }
 
-const FIELDS = `id url number title state isDraft merged createdAt additions deletions reviewDecision
-  author { login avatarUrl(size: 40) }
+const FIELDS = `id url number title state isDraft merged reviewDecision
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
   eyes: reactions(content: EYES, first: 30) { totalCount nodes { user { login avatarUrl(size: 40) } } }
   reactionGroups { content viewerHasReacted }`;
@@ -161,11 +152,11 @@ function forget() {
 function composeView() {
   const title = h("input", { id: "title", class: "input", placeholder: "Bump actions/checkout to v6", value: bundle.title, maxlength: 200 });
   const list = h("textarea", {
-    id: "list", class: "input", rows: 9, spellcheck: "false",
+    id: "list", class: "input", rows: 6, spellcheck: "false",
     placeholder: "https://github.com/acme/api/pull/412\nacme/web#97\nacme/worker/pull/31",
   });
   const hint = h("p", { class: "hint" });
-  const go = h("button", { class: "btn btn-primary", type: "submit", disabled: true }, "Create link");
+  const go = h("button", { class: "btn", type: "submit", disabled: true }, "Create link");
   const update = () => {
     const { prs, bad } = parseList(list.value);
     go.disabled = !prs.length;
@@ -176,7 +167,7 @@ function composeView() {
   };
   list.addEventListener("input", update);
   const form = h("form", {
-    class: "card compose",
+    class: "compose",
     onsubmit: (e) => {
       e.preventDefault();
       location.hash = encode({ title: title.value, prs: parseList(list.value).prs });
@@ -189,30 +180,26 @@ function composeView() {
   update();
   return h("section", { class: "wrap" },
     h("h1", { class: "hero" }, "One link for the same pull request in every repository"),
-    h("p", { class: "lede" },
-      "Paste the pull requests of one change. sheaf keeps the list in the link itself, after the #, which browsers never send to a server. ",
-      "Whoever opens the link sees every pull request's state, checks and review, and who has marked it 👀 seen."),
+    h("p", { class: "lede" }, "The list lives in the link, after the #, so it never reaches a server."),
     form,
   );
 }
 
 function tokenCard() {
-  const input = h("input", { class: "input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "github_pat_… or ghp_…", "aria-label": "GitHub token", required: true });
+  const input = h("input", { class: "input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "GitHub token to load these", "aria-label": "GitHub token", required: true });
   const remember = h("input", { type: "checkbox", id: "remember" });
   return h("form", {
-    class: "card token",
+    class: "token",
     onsubmit: (e) => {
       e.preventDefault();
       token.set(input.value.trim(), remember.checked);
       load();
     },
   },
-    h("h2", {}, "Connect to GitHub"),
-    h("p", {}, "sheaf reads these pull requests with your token, straight from this tab to api.github.com. Nothing else sees it."),
-    h("div", { class: "token-row" }, input, h("button", { class: "btn btn-primary", type: "submit" }, "Connect")),
-    h("label", { class: "check" }, remember, " Remember on this device (otherwise it is forgotten when the tab closes)"),
+    h("div", { class: "token-row" }, input, h("button", { class: "btn", type: "submit" }, "Connect")),
+    h("label", { class: "check" }, remember, " Remember on this device"),
     h("details", {},
-      h("summary", {}, "Which token?"),
+      h("summary", {}, "Which token? It goes only to api.github.com"),
       h("p", {}, "A fine-grained token with ", h("b", {}, "Pull requests: read and write"), " on the repositories (write is only used for 👀), or a classic token with ", h("code", {}, "repo"), ". If you use the GitHub CLI, ", h("code", {}, "gh auth token"), " prints one."),
     ),
   );
@@ -226,48 +213,49 @@ function stateOf(pr) {
 }
 
 const CHECKS = { SUCCESS: ["check", "ok", "Checks passed"], FAILURE: ["x", "fail", "Checks failed"], ERROR: ["x", "fail", "Checks errored"], PENDING: ["dot", "wait", "Checks running"], EXPECTED: ["dot", "wait", "Checks expected"] };
-const REVIEW = { APPROVED: ["Approved", "ok"], CHANGES_REQUESTED: ["Changes requested", "fail"], REVIEW_REQUIRED: ["Review required", "muted"] };
+const REVIEW = { APPROVED: ["approved", "ok"], CHANGES_REQUESTED: ["changes requested", "fail"], REVIEW_REQUIRED: ["review required", ""] };
 
-function rowView(row) {
+// The title most pull requests share; rows only repeat a title that differs from it.
+function commonTitle(found) {
+  const n = {};
+  for (const r of found) n[r.pr.title] = (n[r.pr.title] || 0) + 1;
+  return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+}
+
+function rowView(row, common) {
   const { ref, pr, seen } = row;
   const kind = stateOf(pr);
-  // Every row carries the same change, so the repository leads and the title is secondary.
-  const prLink = (href) => h("a", { class: "title", href }, `${ref.owner}/`, h("b", {}, ref.repo), h("span", { class: "num" }, ` #${ref.number}`));
+  const href = pr ? safeUrl(pr.url, "https://github.com/") : `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}`;
+  const link = h("a", { class: "title", href }, h("span", { class: "owner" }, `${ref.owner}/`), h("b", {}, ref.repo), h("span", { class: "num" }, ` #${ref.number}`));
   if (!pr) {
-    return h("li", { class: "row missing" },
+    return h("li", { class: "row" },
       h("span", { class: "state missing" }, icon("open")),
-      h("div", { class: "main" },
-        h("div", { class: "line1" }, prLink(`https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}`)),
-        h("div", { class: "line2" }, state.rows ? "Not found, or your token can't see this repository" : "Connect to GitHub to see its state"),
-      ),
+      h("div", { class: "main" }, link, h("div", { class: "sub" }, state.rows ? "not found, or your token can't see it" : "")),
     );
   }
-  const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup?.state;
-  const checks = CHECKS[rollup];
+  const checks = CHECKS[pr.commits.nodes[0]?.commit.statusCheckRollup?.state];
   const review = REVIEW[pr.reviewDecision];
   const eyes = pr.eyes.nodes.map((n) => n.user).filter(Boolean);
   return h("li", { class: `row${seen ? " is-seen" : ""}` },
-    h("span", { class: `state ${kind}`, title: kind[0].toUpperCase() + kind.slice(1) }, icon(kind === "draft" ? "draft" : kind)),
+    h("span", { class: `state ${kind}`, title: kind[0].toUpperCase() + kind.slice(1) }, icon(kind)),
     h("div", { class: "main" },
-      h("div", { class: "line1" },
-        prLink(safeUrl(pr.url, "https://github.com/")),
+      h("div", { class: "line" },
+        link,
         checks && h("span", { class: `checks ${checks[1]}`, title: checks[2] }, icon(checks[0])),
-        review && h("span", { class: `label ${review[1]}` }, review[0]),
+        review && h("span", { class: `review ${review[1]}` }, review[0]),
       ),
-      h("div", { class: "line2" },
-        h("span", { class: "pr-title" }, pr.title), ` · opened ${ago(pr.createdAt)} by ${pr.author?.login ?? "ghost"} · `,
-        h("span", { class: "add" }, `+${pr.additions}`), " ", h("span", { class: "del" }, `−${pr.deletions}`),
-      ),
+      pr.title !== common && h("div", { class: "sub" }, pr.title),
     ),
-    h("div", { class: "eyes", title: eyes.length ? `Seen by ${eyes.map((u) => u.login).join(", ")}` : "Nobody has marked this seen" },
-      eyes.slice(0, 5).map((u) => avatar(u)),
+    h("div", { class: "eyes", title: eyes.length ? `Seen by ${eyes.map((u) => u.login).join(", ")}` : "" },
+      eyes.slice(0, 5).map((u) => avatar(u, 18)),
       pr.eyes.totalCount > 5 && h("span", { class: "more" }, `+${pr.eyes.totalCount - 5}`),
     ),
     h("button", {
-      class: `btn btn-sm seen-btn${seen ? " on" : ""}`, "aria-pressed": String(seen), disabled: state.busy,
-      title: seen ? "Remove your 👀 reaction" : "Add a 👀 reaction so others know you've seen it",
+      class: `eye${seen ? " on" : ""}`, "aria-pressed": String(seen), disabled: state.busy,
+      "aria-label": seen ? `Unmark ${ref.repo} seen` : `Mark ${ref.repo} seen`,
+      title: seen ? "Seen. Click to remove your 👀" : "Mark seen with 👀",
       onclick: () => react([row]),
-    }, icon("eye"), seen ? "Seen" : "Mark seen"),
+    }, icon("eye")),
   );
 }
 
@@ -276,8 +264,8 @@ function bundleView() {
   const found = rows.filter((r) => r.pr);
   const count = (k) => found.filter((r) => stateOf(r.pr) === k).length;
   const mine = found.filter((r) => r.seen).length;
-  const repos = new Set(bundle.prs.map((p) => `${p.owner}/${p.repo}`.toLowerCase())).size;
-  const owners = [...new Set(bundle.prs.map((p) => p.owner))];
+  const unseen = found.filter((r) => !r.seen);
+  const common = commonTitle(found);
 
   // People who put 👀 on every pull request that could be read.
   const everyone = found.length
@@ -286,50 +274,44 @@ function bundleView() {
     : [];
 
   const copy = h("button", {
-    class: "btn",
+    class: "quiet",
     onclick: async () => {
       await navigator.clipboard.writeText(location.href);
-      copy.lastChild.textContent = "Copied";
-      setTimeout(() => (copy.lastChild.textContent = "Copy link"), 1500);
+      copy.textContent = "Copied";
+      setTimeout(() => (copy.textContent = "Copy link"), 1500);
     },
-  }, icon("copy"), h("span", {}, "Copy link"));
+  }, "Copy link");
 
-  const unseen = found.filter((r) => !r.seen);
-  const fill = h("span", { class: "fill" });
-  fill.style.width = `${found.length ? (100 * mine) / found.length : 0}%`; // CSSOM, which the style-src CSP allows
+  const n = bundle.prs.length;
+  const stats = state.rows
+    ? [
+        `${n} pull request${n === 1 ? "" : "s"}`,
+        count("open") + count("draft") && `${count("open") + count("draft")} open`,
+        count("merged") && `${count("merged")} merged`,
+        count("closed") && `${count("closed")} closed`,
+        `you've seen ${mine} of ${found.length}`,
+      ].filter(Boolean).join(" · ")
+    : `${n} pull request${n === 1 ? "" : "s"}`;
+
   return h("section", { class: "wrap" },
     h("div", { class: "head" },
-      h("div", {},
-        h("h1", {}, bundle.title || "Untitled bundle"),
-        h("p", { class: "meta" }, `${bundle.prs.length} pull request${bundle.prs.length === 1 ? "" : "s"} in ${repos} ${repos === 1 ? "repository" : "repositories"} · ${owners.join(", ")}`),
-      ),
+      h("h1", {}, bundle.title || common || "Untitled bundle"),
       h("div", { class: "actions" },
         copy,
-        h("button", { class: "btn", onclick: () => { location.hash = ""; app.replaceChildren(composeFor()); } }, icon("pencil"), "Edit"),
-        token.get() && h("button", { class: "btn", onclick: load, disabled: state.busy }, icon("sync", state.busy ? "spin" : ""), "Refresh"),
+        h("button", { class: "quiet", onclick: () => { location.hash = ""; app.replaceChildren(composeFor()); } }, "Edit"),
+        token.get() && h("button", { class: "quiet icon-only", onclick: load, disabled: state.busy, "aria-label": "Refresh", title: "Refresh" }, icon("sync", state.busy ? "spin" : "")),
       ),
     ),
+    h("p", { class: "meta" },
+      stats,
+      state.rows && unseen.length > 0 && [" · ", h("button", { class: "link", disabled: state.busy, onclick: () => react(unseen) }, "mark all seen")],
+      everyone.length > 0 && h("span", { class: "everyone", title: "Seen every pull request" }, everyone.slice(0, 8).map((u) => avatar(u, 18))),
+    ),
+    common && bundle.title && common !== bundle.title && h("p", { class: "common" }, common),
     state.error && h("p", { class: "flash", role: "alert" }, state.error),
     !token.get() && tokenCard(),
-    state.rows && h("div", { class: "summary" },
-      h("span", { class: "chip open" }, icon("open"), `${count("open") + count("draft")} open`),
-      count("merged") > 0 && h("span", { class: "chip merged" }, icon("merged"), `${count("merged")} merged`),
-      count("closed") > 0 && h("span", { class: "chip closed" }, icon("closed"), `${count("closed")} closed`),
-      h("span", { class: "progress", title: "Pull requests you have marked 👀" },
-        h("span", { class: "bar" }, fill),
-        `You've seen ${mine} of ${found.length}`,
-      ),
-      everyone.length > 0 && h("span", { class: "everyone" }, "Seen all: ", everyone.slice(0, 8).map((u) => avatar(u))),
-    ),
-    h("div", { class: "box" },
-      h("div", { class: "box-head" },
-        h("span", {}, "👀 shows who has looked at each pull request"),
-        state.rows && unseen.length > 0 && h("button", { class: "btn btn-sm", disabled: state.busy, onclick: () => react(unseen) }, `Mark all ${unseen.length} seen`),
-      ),
-      h("ul", { class: "rows" }, rows.map(rowView)),
-    ),
+    h("ul", { class: "rows" }, rows.map((r) => rowView(r, common))),
     bundle.prs.length > MAX && h("p", { class: "hint" }, `Showing the first ${MAX} of ${bundle.prs.length}.`),
-    state.loadedAt > 0 && h("p", { class: "hint foot" }, `Updated ${new Date(state.loadedAt).toLocaleTimeString()} · refreshes when you come back to this tab`),
   );
 }
 
