@@ -6,7 +6,7 @@
 
 A web page that turns the same pull request opened in many repositories into one link, showing each one's state, checks and review, and who has marked it 👀 seen.
 
-You paste the pull requests of one change, say a dependency bump in eight services, and get a link at [preacherxp.github.io/sheaf](https://preacherxp.github.io/sheaf/). Whoever opens it connects with their own GitHub token and sees every pull request in one quiet list in GitHub's colours: open, draft, merged or closed, whether checks pass, whether review is still required. The eye button puts a 👀 reaction on the pull request from your account, so the next person can tell at a glance which ones somebody has already looked at. There is no server: the list lives in the link, and the page talks only to GitHub.
+You paste the pull requests of one change, say a dependency bump in eight services, and get a link at [preacherxp.github.io/sheaf](https://preacherxp.github.io/sheaf/). Whoever opens it connects with their own GitHub token and sees every pull request in one quiet list: open, draft, merged or closed, whether checks pass, whether review is still required. The eye button puts a 👀 reaction on the pull request from your account, so the next person can tell at a glance which ones somebody has already looked at. There is no server: the list lives in the link, and the page talks only to GitHub.
 
 <p align="center"><img src="docs/hero.png" width="800" alt="sheaf in dark mode showing the bundle Update actions/checkout to v6.1.0, with the line 6 pull requests, 6 open, you've seen 0 of 6, mark all seen, and the shared Renovate title under it. Below, six Grafana pull requests as plain rows, from network-topology-exporter #239 with a red cross for failing checks to grafana-opentelemetry-android #10 with a green tick, most marked review required, each ending in an eye button."></p>
 
@@ -40,7 +40,7 @@ Any static host works the same way, GitHub Pages included. To uninstall, click *
 
 <p align="center"><img src="docs/connect.png" width="640" alt="A shared link before connecting: the bundle title and 6 pull requests, a Paste a GitHub token field with a blue Create one on GitHub link and a Connect button, a Remember on this device box and a note that the token goes only to api.github.com, then the six pull requests listed by repository and number."></p>
 
-- **Eye button.** At the end of each row. Click it to add your 👀 reaction to that pull request on GitHub, again to take it back. It turns blue while yours is on. Avatars of everyone who reacted 👀 sit next to it.
+- **Eye button.** At the end of each row. Click it to add your 👀 reaction to that pull request on GitHub, again to take it back. It turns gold while yours is on. Avatars of everyone who reacted 👀 sit next to it.
 - **mark all seen.** Adds 👀 to every pull request in the bundle you haven't marked yet.
 - **you've seen N of M.** Your own progress, in the line under the title. Avatars at the end of that line are the people who reacted 👀 on every one.
 - **Titles.** The title most pull requests share is shown once, under the bundle title. A row only shows its own title when it differs.
@@ -86,7 +86,8 @@ flowchart LR
 - **`index.html`** loads the page and sets the Content Security Policy that pins every request to `api.github.com` and avatars.
 - **`bundle.js`** reads and writes the `#t=…&p=owner/repo/123,…` fragment. It accepts pull request URLs and the short forms, drops duplicates and anything that isn't a valid owner, repository and number, so nothing from the link reaches a query unchecked.
 - **`app.js`** builds one GraphQL query per load with an alias for each pull request, passing names as variables, and renders the result with `textContent` only, so a pull request title can't inject markup. 👀 uses `addReaction` and `removeReaction`, then reloads.
-- **`style.css`** uses GitHub's colours and type for light and dark mode, without its boxes and pills.
+- **`style.css`** uses GitHub's neutrals, status colours and type for light and dark mode, with a wheat gold of its own for the mark, the seen state and links.
+- **`mark.svg`** is the mark: three pull requests, tied into one sheaf. `favicon.svg` is the same on a dark tile.
 - The Octicons are inlined from [primer/octicons](https://github.com/primer/octicons) (MIT).
 
 ## Development

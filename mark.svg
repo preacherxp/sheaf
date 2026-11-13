@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .s { stroke: #e3b341; } .d { fill: #e3b341; }
+    @media (prefers-color-scheme: light) { .s { stroke: #9a6700; } .d { fill: #9a6700; } }
+  </style>
+  <!-- a sheaf: three pull requests, tied into one -->
+  <g class="s" fill="none" stroke-width="2.4" stroke-linecap="round">
+    <path d="M13 28.5 6.6 8.2M16 28.5V6.6M19 28.5 25.4 8.2"/>
+    <path d="M9.6 19h12.8" stroke-width="3.4"/>
+  </g>
+  <g class="d"><circle cx="6.2" cy="6.8" r="2.7"/><circle cx="16" cy="4.6" r="2.7"/><circle cx="25.8" cy="6.8" r="2.7"/></g>
+</svg>
