@@ -13,7 +13,7 @@ You paste the pull requests of one change, say a dependency bump in eight servic
 ## Requirements
 
 - A current Chrome, Edge, Firefox or Safari (Chrome 111, Firefox 113, Safari 16.2 or later)
-- A GitHub token for each person who opens a link. GitHub's GraphQL API needs one even for public repositories:
+- A GitHub token for each person who opens a link, which the page helps create in two clicks. A page can't use your github.com login: browsers don't send its cookies to other sites, and GitHub's API only takes tokens. GitHub's GraphQL API needs one even for public repositories:
   - fine-grained, with **Pull requests: Read and write** on the repositories (write is only used for 👀), or
   - classic, with the `repo` scope, or whatever `gh auth token` prints if you use the GitHub CLI
 - [Node.js](https://nodejs.org) 20 or later to run the tests; nothing to build
@@ -36,9 +36,9 @@ Any static host works the same way, GitHub Pages included. To uninstall, click *
 
 1. Open the page without a link. Give the bundle a title and paste its pull requests: full URLs, `owner/repo#123` or `owner/repo/123`, one per line, or any text that contains PR links, such as a Slack message or a Markdown checklist. Every PR link in a line counts. The counter under the box says how many it understood and which lines had none.
 2. Click **Create link**, then **Copy link**, and send that link wherever you would have pasted eight.
-3. Whoever opens it pastes a token under **Connect to GitHub** and sees the list.
+3. Whoever opens it clicks **Create one on GitHub**. Because they are logged in, GitHub's token page opens with the `repo` scope and the name sheaf already filled in: pick an expiry, click **Generate token**, copy it. Pasting it into sheaf connects straight away. Tick **Remember on this device** to do this once.
 
-<p align="center"><img src="docs/connect.png" width="640" alt="A shared link before connecting: the bundle title and 6 pull requests, a GitHub token field with a Connect button, a Remember on this device box and a Which token? hint, then the six pull requests listed by repository and number."></p>
+<p align="center"><img src="docs/connect.png" width="640" alt="A shared link before connecting: the bundle title and 6 pull requests, a Paste a GitHub token field with a blue Create one on GitHub link and a Connect button, a Remember on this device box and a note that the token goes only to api.github.com, then the six pull requests listed by repository and number."></p>
 
 - **Eye button.** At the end of each row. Click it to add your 👀 reaction to that pull request on GitHub, again to take it back. It turns blue while yours is on. Avatars of everyone who reacted 👀 sit next to it.
 - **mark all seen.** Adds 👀 to every pull request in the bundle you haven't marked yet.

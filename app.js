@@ -185,10 +185,15 @@ function composeView() {
   );
 }
 
+// GitHub fills in the scope and name from the URL; you only pick an expiry and click Generate.
+const NEW_TOKEN = "https://github.com/settings/tokens/new?scopes=repo&description=sheaf";
+const NEW_PUBLIC_TOKEN = "https://github.com/settings/tokens/new?scopes=public_repo&description=sheaf%20(public%20repos)";
+const LOOKS_LIKE_TOKEN = /^(ghp|github_pat|gho)_\w{20,}$/;
+
 function tokenCard() {
-  const input = h("input", { class: "input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "GitHub token to load these", "aria-label": "GitHub token", required: true });
+  const input = h("input", { class: "input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "Paste a GitHub token", "aria-label": "GitHub token", required: true });
   const remember = h("input", { type: "checkbox", id: "remember" });
-  return h("form", {
+  const form = h("form", {
     class: "token",
     onsubmit: (e) => {
       e.preventDefault();
@@ -196,15 +201,27 @@ function tokenCard() {
       load();
     },
   },
-    h("div", { class: "token-row" }, input, h("button", { class: "btn", type: "submit" }, "Connect")),
-    h("div", { class: "token-opts" },
-    h("label", { class: "check" }, remember, " Remember on this device"),
-    h("details", {},
-      h("summary", {}, "Which token? It goes only to api.github.com"),
-      h("p", {}, "A fine-grained token with ", h("b", {}, "Pull requests: read and write"), " on the repositories (write is only used for 👀), or a classic token with ", h("code", {}, "repo"), ". If you use the GitHub CLI, ", h("code", {}, "gh auth token"), " prints one."),
+    h("div", { class: "token-row" },
+      input,
+      h("a", { class: "quiet new-token", href: NEW_TOKEN, target: "_blank", rel: "noopener noreferrer" }, "Create one on GitHub"),
+      h("button", { class: "btn", type: "submit" }, "Connect"),
     ),
+    h("div", { class: "token-opts" },
+      h("label", { class: "check" }, remember, " Remember on this device"),
+      h("details", {},
+        h("summary", {}, "It goes only to api.github.com"),
+        h("p", {},
+          "The link opens GitHub's token page with the ", h("code", {}, "repo"), " scope and the name sheaf filled in; you pick an expiry and click ", h("b", {}, "Generate token"), ". ",
+          "For public repositories only, ", h("a", { href: NEW_PUBLIC_TOKEN, target: "_blank", rel: "noopener noreferrer" }, "use public_repo instead"), ". ",
+          "A fine-grained token with ", h("b", {}, "Pull requests: read and write"), " works too, and so does ", h("code", {}, "gh auth token"), "."),
+      ),
     ),
   );
+  // Pasting a whole token connects straight away; typing still waits for Connect.
+  input.addEventListener("paste", () => setTimeout(() => LOOKS_LIKE_TOKEN.test(input.value.trim()) && form.requestSubmit()));
+  // Back from GitHub's tab with a token on the clipboard: be ready to paste.
+  window.addEventListener("focus", () => input.isConnected && !input.value && input.focus(), { once: true });
+  return form;
 }
 
 function stateOf(pr) {

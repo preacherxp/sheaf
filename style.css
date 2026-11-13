@@ -67,8 +67,12 @@ textarea.input { font: 13px/1.7 var(--mono); resize: vertical; }
 .bad { color: var(--closed); }
 
 .token { margin: 24px 0 8px; }
-.token-row { display: flex; gap: 12px; align-items: center; }
+.token-row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.token-row .input { flex: 1 1 260px; }
 .token-row .input { font-family: var(--mono); font-size: 13px; }
+.new-token { white-space: nowrap; font-size: 13px; color: var(--accent); }
+.new-token:hover { color: var(--accent); text-decoration: underline; }
+.token-row .btn { margin-left: auto; }
 .token-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 12px; font-size: 12px; color: var(--muted); }
 .check { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; cursor: pointer; }
 .check input { margin: 0; }
