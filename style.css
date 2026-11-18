@@ -16,7 +16,7 @@
 
 * { box-sizing: border-box; }
 html { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--font); }
-body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; border-top: 3px solid var(--accent); }
+body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; }
 main { flex: 1; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -125,7 +125,70 @@ textarea.input { font: 13px/1.7 var(--mono); resize: vertical; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin svg { animation: none; } }
 
+/* A single amber glass object gives the ticket a cover; the list stays quiet. */
+:root {
+  --bg: #f5f4ef; --fg: #282721; --muted: #56554e; --faint: #636259;
+  --line: #79746540; --hover: #eae8df; --glass: #ffffffab;
+  --edge: #ffffffd9; --shade: #39321e12;
+  --font: "Geist", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #181818; --fg: #f3f1eb; --muted: #bcb9af; --faint: #a39f94;
+    --line: #d6ccad29; --hover: #272727; --glass: #1f1f1fd9;
+    --edge: #ffffff19; --shade: #00000030;
+  }
+}
+.top, .glass-head, .token, .compose {
+  background-color: var(--glass); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: inset 0 1px var(--edge), 0 8px 32px var(--shade);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+}
+.top { width: fit-content; max-width: calc(100% - 32px); margin-top: 16px; padding: 8px 16px; gap: 12px; flex-wrap: wrap; }
+.who:empty { display: none; }
+.wrap, .foot { max-width: 880px; }
+.wrap { padding-top: 40px; }
+.glass-head { position: relative; isolation: isolate; overflow: hidden; padding: 40px; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.glass-head::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  inset: 0 16px 0 auto; width: 32%; background: url("./glass.png") center / contain no-repeat;
+}
+.glass-head > * { max-width: 66%; }
+.glass-head::after {
+  content: ""; position: absolute; pointer-events: none; z-index: -2; inset: 0 0 0 66%; opacity: .16;
+  background: center / 16px 16px url("./dots.svg");
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .glass-head::before { transition: transform .5s cubic-bezier(.22,1,.36,1); }
+  .glass-head:hover::before { transform: translateY(-4px) rotate(-3deg); }
+}
+.eyebrow { color: var(--accent); font: 12px/16px var(--mono); margin: 0; }
+.head h1, .hero { font-size: 36px; line-height: 40px; letter-spacing: -.045em; text-wrap: balance; }
+.glass-head h1 { font-size: 60px; line-height: 1; }
+.head .actions { order: 4; margin-top: 8px; font-size: 14px; }
+.meta, .num { font-variant-numeric: tabular-nums; }
+.list-heading { font-size: 18px; line-height: 28px; letter-spacing: -.025em; margin: 32px 0 12px; }
+.result-count { font: 12px/16px var(--mono); color: var(--muted); margin-left: 8px; vertical-align: middle; }
+.rows { margin-top: 12px; }
+.rows:empty { display: none; }
+.row { padding: 12px 4px; }
+.row:focus-within, .row:hover { background: var(--glass); }
+.ticket-title { font-size: 16px; line-height: 24px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.ticket-title:hover { text-decoration: underline; }
+.ticket-title:visited { color: var(--muted); }
+.reference { font-family: var(--mono); }
+.title b { font-weight: 600; }
+.token, .compose { padding: 24px; }
+.btn:hover:not(:disabled) { opacity: .86; }
+.btn:active:not(:disabled), .eye:active:not(:disabled) { transform: translateY(1px); }
+.input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hero, .lede { max-width: 680px; }
+
 @media (max-width: 600px) {
+  .wrap { padding: 24px 16px 40px; }
+  .glass-head { padding: 16px; }
+  .glass-head::before { right: 8px; }
+  .head h1, .hero { font-size: 30px; line-height: 36px; }
   .tag { display: none; }
   /* title, stats, then the actions, instead of actions wedged between title and stats */
   .head { grid-template-columns: 1fr; }

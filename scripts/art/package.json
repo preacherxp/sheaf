@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node glass.mjs",
+    "build:page": "node build-page.mjs"
+  },
+  "dependencies": {
+    "@vgpu/wgsl": "0.6.0",
+    "pngjs": "7.0.0",
+    "vgpu": "0.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,5 +1,8 @@
 {
+  "name": "sheaf",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test" }
+  "bin": { "sheaf": "./cli.mjs" },
+  "scripts": { "test": "node --test", "start": "node cli.mjs" }
 }

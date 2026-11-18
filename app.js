@@ -1,4 +1,5 @@
 import { parseList, encode, decode } from "./bundle.js";
+import { searchTicket } from "./ticket.js";
 
 // A framed copy could trick a click on "Mark seen", so never run inside a frame.
 if (window.top !== window.self) {
@@ -94,22 +95,31 @@ let bundle = decode(location.hash);
 let state = { rows: null, viewer: null, error: "", busy: false, loadedAt: 0 };
 
 async function load() {
-  if (!token.get() || !bundle.prs.length) return render();
+  if (!token.get() || !(bundle.ticket || bundle.prs.length)) return render();
+  const current = bundle, target = state;
   state.busy = true;
   render();
   try {
-    const prs = bundle.prs.slice(0, MAX);
-    const data = await gql(...loadQuery(prs));
+    let data;
+    if (bundle.ticket) {
+      data = await searchTicket(bundle.ticket, gql, FIELDS);
+    } else {
+      const prs = bundle.prs.slice(0, MAX);
+      data = await gql(...loadQuery(prs));
+      data.pairs = prs.map((ref, i) => ({ ref, pr: data[`p${i}`]?.pullRequest ?? null }));
+    }
+    if (current !== bundle || target !== state) return;
     state.viewer = data.viewer;
-    state.rows = prs.map((ref, i) => {
-      const pr = data[`p${i}`]?.pullRequest ?? null;
+    state.truncated = data.truncated;
+    state.rows = data.pairs.map(({ ref, pr }) => {
       const seen = !!pr?.reactionGroups?.find((g) => g.content === "EYES")?.viewerHasReacted;
       return { ref, pr, seen };
     });
     state.error = "";
     state.loadedAt = Date.now();
   } catch (e) {
-    if (e.auth) token.clear();
+    if (current !== bundle || target !== state) return;
+    if (e.auth) { token.clear(); state.rows = null; }
     state.error = e.message;
   }
   state.busy = false;
@@ -140,7 +150,7 @@ function render() {
       ? [avatar(state.viewer), h("span", {}, state.viewer.login), h("button", { class: "btn-link", onclick: forget }, "Forget token")]
       : []),
   );
-  app.replaceChildren(bundle.prs.length ? bundleView() : composeView());
+  app.replaceChildren(bundle.ticket || bundle.prs.length ? bundleView() : composeView());
 }
 
 function forget() {
@@ -188,7 +198,7 @@ function composeView() {
 // GitHub fills in the scope and name from the URL; you only pick an expiry and click Generate.
 const NEW_TOKEN = "https://github.com/settings/tokens/new?scopes=repo&description=sheaf";
 const NEW_PUBLIC_TOKEN = "https://github.com/settings/tokens/new?scopes=public_repo&description=sheaf%20(public%20repos)";
-const LOOKS_LIKE_TOKEN = /^(ghp|github_pat|gho)_\w{20,}$/;
+const LOOKS_LIKE_TOKEN = /^(gh[pousr]|github_pat)_\w{20,}$/; // every prefix `gh auth token` can print
 
 function tokenCard() {
   const input = h("input", { class: "input", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "Paste a GitHub token", "aria-label": "GitHub token", required: true });
@@ -259,11 +269,12 @@ function rowView(row, common) {
     h("span", { class: `state ${kind}`, title: kind[0].toUpperCase() + kind.slice(1) }, icon(kind)),
     h("div", { class: "main" },
       h("div", { class: "line" },
-        link,
+        bundle.ticket ? h("a", { class: "title ticket-title", href }, pr.title) : link,
         checks && h("span", { class: `checks ${checks[1]}`, title: checks[2] }, icon(checks[0])),
         review && h("span", { class: `review ${review[1]}` }, review[0]),
       ),
-      pr.title !== common && h("div", { class: "sub" }, pr.title),
+      bundle.ticket ? h("div", { class: "sub reference" }, `${ref.owner}/${ref.repo} #${ref.number}`) :
+        pr.title !== common && h("div", { class: "sub" }, pr.title),
     ),
     h("div", { class: "eyes", title: eyes.length ? `Seen by ${eyes.map((u) => u.login).join(", ")}` : "" },
       eyes.slice(0, 5).map((u) => avatar(u, 18)),
@@ -284,7 +295,7 @@ function bundleView() {
   const count = (k) => found.filter((r) => stateOf(r.pr) === k).length;
   const mine = found.filter((r) => r.seen).length;
   const unseen = found.filter((r) => !r.seen);
-  const common = commonTitle(found);
+  const common = bundle.ticket ? "" : commonTitle(found);
 
   // People who put 👀 on every pull request that could be read.
   const everyone = found.length
@@ -301,7 +312,7 @@ function bundleView() {
     },
   }, "Copy link");
 
-  const n = bundle.prs.length;
+  const n = bundle.ticket ? rows.length : bundle.prs.length;
   const stats = state.rows
     ? [
         `${n} pull request${n === 1 ? "" : "s"}`,
@@ -310,14 +321,16 @@ function bundleView() {
         count("closed") && `${count("closed")} closed`,
         `you've seen ${mine} of ${found.length}`,
       ].filter(Boolean).join(" · ")
+    : bundle.ticket ? (state.busy ? "Searching pull request titles…" : `Search pull request titles for ${bundle.ticket}`)
     : `${n} pull request${n === 1 ? "" : "s"}`;
 
   return h("section", { class: "wrap" },
-    h("header", { class: "head" },
+    h("header", { class: "head glass-head" },
+      h("p", { class: "eyebrow" }, bundle.ticket ? "Ticket index / GitHub" : "Pull request bundle"),
       h("h1", {}, bundle.title || common || "Untitled bundle"),
       h("div", { class: "actions" },
         copy,
-        h("button", { class: "quiet", onclick: () => { location.hash = ""; app.replaceChildren(composeFor()); } }, "Edit"),
+        !bundle.ticket && h("button", { class: "quiet", onclick: () => { location.hash = ""; app.replaceChildren(composeFor()); } }, "Edit"),
         token.get() && h("button", { class: "quiet icon-only", onclick: load, disabled: state.busy, "aria-label": "Refresh", title: "Refresh" }, icon("sync", state.busy ? "spin" : "")),
       ),
       h("p", { class: "meta" },
@@ -327,8 +340,11 @@ function bundleView() {
       ),
       common && bundle.title && common !== bundle.title && h("p", { class: "common" }, common),
     ),
+    h("h2", { class: "list-heading" }, "Pull requests", state.rows && h("span", { class: "result-count" }, String(n).padStart(2, "0"))),
     state.error && h("p", { class: "flash", role: "alert" }, state.error),
     !token.get() && tokenCard(),
+    bundle.ticket && state.rows && !n && h("p", { class: "hint" }, `No visible pull requests have ${bundle.ticket} in the title.`),
+    state.truncated && h("p", { class: "hint" }, "GitHub search returned only its first 1,000 candidates."),
     h("ul", { class: "rows" }, rows.map((r) => rowView(r, common))),
     bundle.prs.length > MAX && h("p", { class: "hint" }, `Showing the first ${MAX} of ${bundle.prs.length}.`),
   );
@@ -346,15 +362,15 @@ function composeFor() {
 
 window.addEventListener("hashchange", () => {
   const next = decode(location.hash);
-  if (next.prs.length === 0 && !location.hash) return; // Edit cleared the hash on purpose
+  if (!bundle.ticket && next.prs.length === 0 && !location.hash) return; // Edit cleared the hash on purpose
   bundle = next;
-  state.rows = null;
+  state = { rows: null, viewer: state.viewer, error: "", busy: false, loadedAt: 0 };
   load();
 });
 
 // Coming back from a pull request tab is when 👀 most likely changed.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && token.get() && bundle.prs.length && !state.busy && Date.now() - state.loadedAt > 15000) load();
+  if (document.visibilityState === "visible" && token.get() && (bundle.ticket || bundle.prs.length) && !state.busy && Date.now() - state.loadedAt > 15000) load();
 });
 
 load();

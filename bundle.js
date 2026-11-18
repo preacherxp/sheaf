@@ -2,6 +2,7 @@
 //   #t=Bump%20checkout&p=grafana/faro/128,grafana/lambda-promtail/234
 
 const NAME = /^[A-Za-z0-9_.-]{1,100}$/;
+export const ticketKey = (s) => /^[a-z][a-z0-9]*-\d+$/i.test(s?.trim()) ? s.trim().toUpperCase() : "";
 
 // Accepts a PR URL, owner/repo#123 or owner/repo/123. Returns null for anything else.
 export function parseRef(text) {
@@ -46,6 +47,8 @@ export function encode({ title, prs }) {
 
 export function decode(hash) {
   const q = new URLSearchParams(hash.replace(/^#/, ""));
+  const ticket = ticketKey(q.get("ticket"));
+  if (ticket) return { ticket, title: ticket, prs: [] };
   const { prs } = parseList(q.get("p") || "");
   return { title: (q.get("t") || "").slice(0, 200), prs };
 }
