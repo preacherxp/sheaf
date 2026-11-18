@@ -1,0 +1,43 @@
+name: Build CLI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x64, runner: ubuntu-24.04, binary: sheaf }
+          - { platform: linux-arm64, runner: ubuntu-24.04-arm, binary: sheaf }
+          - { platform: macos-x64, runner: macos-15-intel, binary: sheaf }
+          - { platform: macos-arm64, runner: macos-15, binary: sheaf }
+          - { platform: windows-x64, runner: windows-2025, binary: sheaf.exe }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: node --test
+      - run: bun scripts/build-cli.mjs dist/${{ matrix.binary }}
+      - name: Test the standalone executable
+        shell: bash
+        run: |
+          bin="$PWD/dist/${{ matrix.binary }}"
+          cd "$RUNNER_TEMP"
+          test "$("$bin" --list 'acme/api#1')" = 'https://github.com/acme/api/pull/1'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sheaf-${{ matrix.platform }}
+          path: dist/${{ matrix.binary }}
+          if-no-files-found: error

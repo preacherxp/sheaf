@@ -1,3 +1,4 @@
 node_modules/
 .sheaf/
+/dist/
 .DS_Store

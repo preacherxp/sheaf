@@ -11,7 +11,9 @@ import { searchTicket } from "./ticket.js";
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
 
 export async function snapshot(title, pairs, truncated = false) {
-  const asset = name => readFile(new URL(name, import.meta.url));
+  const asset = name => typeof SHEAF_ASSETS === "undefined"
+    ? readFile(new URL(name, import.meta.url))
+    : Buffer.from(SHEAF_ASSETS[name], "base64");
   const [sheet, glass, dots, runtime] = await Promise.all(["style.css", "glass.png", "dots.svg", "snapshot-renderer.js"].map(asset));
   const script = runtime.toString().replace(/<\/script/gi, "<\\/script");
   const digest = createHash("sha256").update(script).digest("base64");
@@ -62,20 +64,24 @@ export function hashFrom(arg) {
 }
 
 function openBrowser(url) {
-  const [cmd, args] = { darwin: ["open", [url]], linux: ["xdg-open", [url]], win32: ["cmd", ["/c", "start", "", url]] }[process.platform] ?? [];
+  const [cmd, args] = { darwin: ["open", [url]], linux: ["xdg-open", [url]], win32: ["rundll32.exe", ["url.dll,FileProtocolHandler", url]] }[process.platform] ?? [];
   if (!cmd) return;
   spawn(cmd, args, { detached: true, stdio: "ignore" }).on("error", () => {}).unref();
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  const hash = hashFrom(args.find((a) => !a.startsWith("--token=")));
+  const usage = "Usage: sheaf [--list] CC-1234\n       sheaf [--list] 'owner/repo#1, owner/other#2'\n\n--list prints PR links in the terminal instead of opening an HTML checklist.\nTicket search uses SHEAF_TOKEN, GH_TOKEN, or an existing gh login.";
+  if (args.includes("--help") || args.includes("-h")) return console.log(usage);
+  const inputs = args.filter(a => a !== "--list" && !a.startsWith("--token="));
+  if (inputs.length !== 1) throw Error(usage);
+  const hash = hashFrom(inputs[0]);
   const { title, ticket, prs } = decode(hash);
-  if (!ticket && !prs.length) throw Error("Usage: npx . CC-1234   (or pass a quoted PR list)");
+  if (!ticket && !prs.length) throw Error(usage);
   let result = { pairs: prs.map(ref => ({ ref })) };
   if (ticket) {
     const { value } = findToken(args);
-    if (!value) throw Error("Run gh auth login or set SHEAF_TOKEN to search GitHub.");
+    if (!value) throw Error("Set SHEAF_TOKEN or GH_TOKEN to search GitHub, or use an existing gh login.");
     result = await searchTicket(ticket, async (query, variables) => {
       const res = await fetch("https://api.github.com/graphql", { method: "POST", headers: { Authorization: `Bearer ${value}`, "Content-Type": "application/json" }, body: JSON.stringify({ query, variables }) });
       if (!res.ok) throw Error(`GitHub search failed (HTTP ${res.status}). Check your token and rate limit.`);
@@ -83,6 +89,12 @@ async function main() {
       if (errors || !data) throw Error(errors?.[0]?.message || "GitHub returned no data.");
       return data;
     }, "id title number state isDraft");
+  }
+  if (args.includes("--list")) {
+    for (const { ref, pr } of result.pairs) console.log(`https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}${pr ? `\t${pr.title.replace(/[\p{Cc}\p{Cf}]/gu," ")}` : ""}`);
+    if (!result.pairs.length) console.error("No matching pull requests.");
+    if (result.truncated) console.error("GitHub returned only its first 1,000 candidates.");
+    return;
   }
   const html = await snapshot(title || "Pull request bundle", result.pairs, result.truncated);
   await mkdir(".sheaf", { recursive: true, mode: 0o700 });
@@ -94,4 +106,4 @@ async function main() {
   openBrowser(pathToFileURL(path).href);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch(e => { console.error(e.message); process.exitCode = 1; });
+if (typeof SHEAF_ASSETS !== "undefined" || (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href)) main().catch(e => { console.error(e.message); process.exitCode = 1; });
