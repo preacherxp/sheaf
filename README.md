@@ -2,9 +2,26 @@
 
 Sheaf is a standalone CLI for finding GitHub pull requests by ticket key. Run one executable to print the links or open an offline HTML review checklist. No Node, npm, repository clone or server is needed to use the executable.
 
-## Usage
+## Download with curl
 
-Download the artifact for your platform from a successful [Build CLI run](https://github.com/preacherxp/sheaf/actions/workflows/build-cli.yml) and unzip it. Builds cover macOS (Apple silicon and Intel), Linux (ARM64 and x64), and Windows (x64).
+Download the latest `main` build from GitHub Actions via nightly.link. For **macOS on Apple silicon**:
+
+```sh
+curl -fL -o sheaf.zip https://nightly.link/preacherxp/sheaf/workflows/build-cli.yml/main/sheaf-macos-arm64.zip &&
+  unzip sheaf.zip && chmod +x sheaf && ./sheaf --help
+```
+
+For Intel Macs or Linux, replace `macos-arm64` in the URL with `macos-x64`, `linux-arm64`, or `linux-x64`. For **Windows x64**, use PowerShell:
+
+```powershell
+curl.exe -fL -o sheaf.zip https://nightly.link/preacherxp/sheaf/workflows/build-cli.yml/main/sheaf-windows-x64.zip
+Expand-Archive sheaf.zip -DestinationPath .
+.\sheaf.exe --help
+```
+
+You can also download the ZIP directly from a successful [Build CLI run](https://github.com/preacherxp/sheaf/actions/workflows/build-cli.yml).
+
+## Usage
 
 From the directory containing the executable:
 
